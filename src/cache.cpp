@@ -91,14 +91,14 @@ bool DEBAR::Cache::update_cache()
         std::string url = CACHE_INS->d->repo_url + "dists/" + CACHE_INS->d->release_name + "/" + component + "/binary-" + CACHE_INS->d->arch + "/Packages.gz";
         std::cout << "Downloading " << component << " Packages.gz..." << std::endl;
         auto packageZipFile = CACHE_INS->d->path + "/.debar/" + component + ".Packages.gz";
-        // if (!download_file(url, packageZipFile)) {
-        //     std::cerr << "Failed to download file: " << url << std::endl;
-        //     return false;
-        // }
-        // if (!unzip_gz_file(packageZipFile)) {
-        //     std::cerr << "Failed to unzip file: " << packageZipFile << std::endl;
-        //     return false;
-        // }
+        if (!download_file(url, packageZipFile)) {
+            std::cerr << "Failed to download file: " << url << std::endl;
+            return false;
+        }
+        if (!unzip_gz_file(packageZipFile)) {
+            std::cerr << "Failed to unzip file: " << packageZipFile << std::endl;
+            return false;
+        }
         auto packageFile = packageZipFile.substr(0, packageZipFile.find_last_of('.'));
         std::ifstream packageFileStream(packageFile, std::ios::in);
         if (!packageFileStream) {
