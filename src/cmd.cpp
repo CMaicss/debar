@@ -12,6 +12,7 @@ struct DEBAR::CMDPrivate
     bool init = false;
     bool update = false;
     bool get = false;
+    bool suggests = false;
     std::string package;
 };
 
@@ -39,6 +40,11 @@ bool DEBAR::CMD::is_get()
     return m_instance->d->get;
 }
 
+bool DEBAR::CMD::is_suggests()
+{
+    return m_instance->d->suggests;
+}
+
 std::string DEBAR::CMD::get_package_name()
 {
     return m_instance->d->package;
@@ -53,6 +59,7 @@ CMD::CMD(int argc, char const *argv[])
             ("init", "Init repo data in current directory.")
             ("update", "Update repo data in current directory.")
             ("get", "Download deb package and depends.", cxxopts::value<std::string>(), "<package_name>")
+            ("suggests", "Think of suggests as depends, must cooperate --get used.")
             ("help", "Print help");
 
         auto result = options.parse(argc, argv);
@@ -68,6 +75,10 @@ CMD::CMD(int argc, char const *argv[])
 
         if (result.count("update")) {
             d->update = true;
+        }
+
+        if (result.count("suggests")) {
+            d->suggests = true;
         }
 
         if (result.count("get")) {

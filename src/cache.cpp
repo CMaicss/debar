@@ -7,6 +7,8 @@
 #include <zlib.h>
 #include <string.h>
 
+#include "cmd.h"
+
 using namespace DEBAR;
 namespace fs = std::filesystem;
 
@@ -146,6 +148,15 @@ void get_all_package_depends(PackageInfoPtr package, std::vector<PackageInfoPtr>
         if (printed.find(dep->name) == printed.end())
         get_all_package_depends(dep, data, level + 1);
     }
+    if (CMD::is_suggests())
+    {
+        for (auto dep : package->suggests) {
+            if (!dep)
+                continue;
+            if (printed.find(dep->name) == printed.end())
+            get_all_package_depends(dep, data, level + 1);
+        }
+    }
 }
 
 std::string format_size(curl_off_t size) {
@@ -250,6 +261,14 @@ bool DEBAR::Cache::__download_package(PackageInfoPtr package)
     {
         __download_package(dep);
     }
+    if (CMD::is_suggests())
+    {
+        for (auto suggests : package->suggests)
+        {
+            __download_package(suggests);
+        }
+    }
+    
     CACHE_INS->d->already_download.insert(std::pair<std::string, PackageInfoPtr>(package->name, package));
 
     return true;
@@ -307,6 +326,7 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
     PackageInfoPtr package = std::make_shared<PackageInfo>();
     std::string line;
     std::string depends_str;
+    std::string suggests_str;
     while (std::getline(packageFile, line)) {
         if (line.find("Package: ") == 0) {
             auto _name = line.substr(9);
@@ -321,6 +341,8 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
             package->md5 = line.substr(8);
         } else if (line.find("Depends: ") == 0) {
             depends_str = line.substr(9);
+        } else if (line.find("Suggests: ") == 0) {
+            suggests_str = line.substr(10);
         } else if (line.find("Description: ") == 0) {
             package->description = line.substr(13);
         } else if (line.empty()) {
@@ -339,7 +361,17 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
         } else {
             package->depends.push_back(CACHE_INS->d->already_found[dep_name]);
         }
-        
+    }
+    while (suggests_str.find(", ") != std::string::npos) {
+        auto suggests = suggests_str.substr(0, suggests_str.find(", "));
+        suggests_str = suggests_str.substr(suggests_str.find(", ") + 2);
+        auto suggests_name = suggests.substr(0, suggests.find(" "));
+        if (CACHE_INS->d->already_found.find(suggests_name) == CACHE_INS->d->already_found.end())
+        {
+            package->suggests.push_back(__find_package(suggests_name));
+        } else {
+            package->suggests.push_back(CACHE_INS->d->already_found[suggests_name]);
+        }
     }
 
     return package;

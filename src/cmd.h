@@ -49,6 +49,12 @@ public:
     static bool is_get();
 
     /**
+     * @brief Check if command line has --suggests argument.
+     * @return true if --suggests argument is present.
+     */
+    static bool is_suggests();
+
+    /**
      * @brief Get package name from --get argument.
      * @return Package name.
      */
