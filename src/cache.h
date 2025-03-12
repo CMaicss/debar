@@ -73,7 +73,7 @@ private:
      * @param path The path to save file.
      * @return true if download file successfully.
      */
-    static bool download_file(const std::string& url, const std::string& path);
+    static bool download_file(const std::string& url, const std::string& path, const char* prefix);
 
     static bool __download_package(PackageInfoPtr package);
 
