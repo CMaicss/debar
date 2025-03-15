@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "cmd.h"
+#include "utils.h"
 
 using namespace DEBAR;
 namespace fs = std::filesystem;
@@ -93,7 +94,7 @@ bool DEBAR::Cache::update_cache()
         std::string url = CACHE_INS->d->repo_url + "dists/" + CACHE_INS->d->release_name + "/" + component + "/binary-" + CACHE_INS->d->arch + "/Packages.gz";
         std::string text = "Downloading " + component + " Packages.gz";
         auto packageZipFile = CACHE_INS->d->path + "/.debar/" + component + ".Packages.gz";
-        if (!download_file(url, packageZipFile, text.c_str())) {
+        if (!Utils::download_file(url, packageZipFile, text.c_str())) {
             std::cerr << "Failed to download file: " << url << std::endl;
             return false;
         }
@@ -159,19 +160,6 @@ void get_all_package_depends(PackageInfoPtr package, std::vector<PackageInfoPtr>
     }
 }
 
-std::string format_size(curl_off_t size) {
-    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
-    int unit_index = 0;
-    double display_size = static_cast<double>(size);
-    while (display_size >= 1024 && unit_index < 4) {
-        display_size /= 1024;
-        unit_index++;
-    }
-    char buffer[50];
-    snprintf(buffer, sizeof(buffer), "%.2f %s", display_size, units[unit_index]);
-    return std::string(buffer);
-};
-
 bool DEBAR::Cache::download_package(const std::string &name)
 {
     auto package = find_package(name);
@@ -191,7 +179,7 @@ bool DEBAR::Cache::download_package(const std::string &name)
     }
     
     std::cout << "\n" << std::endl;
-    std::cout << "All " << depends.size() + 1 << " packages, Total size " << format_size(size) << ".\n" << std::endl;
+    std::cout << "All " << depends.size() + 1 << " packages, Total size " << Utils::format_size(size) << ".\n" << std::endl;
     __download_package(package);
     std::cout << "All packages are downloaded." << std::endl;
 
@@ -199,63 +187,13 @@ bool DEBAR::Cache::download_package(const std::string &name)
     return true;
 }
 
-int progress_callback(void* ptr, curl_off_t total_to_download, curl_off_t now_downloaded, curl_off_t total_to_upload, curl_off_t now_uploaded)
-{
-    if (total_to_download > 0) {
-        std::cout << (char*)ptr << " - " << (now_downloaded * 100 / total_to_download) << "% ("
-                  << format_size(now_downloaded) << " / " << format_size(total_to_download) << ")           \r" << std::flush;
-    }
-    return 0;
-}
-
-bool DEBAR::Cache::download_file(const std::string &url, const std::string &path, const char* prefix)
-{
-    CURL *curl;
-    FILE *fp;
-    CURLcode res;
-    char errorBuffer[CURL_ERROR_SIZE];
-    
-    curl = curl_easy_init();
-    if (curl) {
-        fp = fopen(path.c_str(), "wb");
-        if (!fp) {
-            std::cerr << "Failed to open file: " << path << std::endl;
-            return false;
-        }
-        struct curl_slist *headers = nullptr;
-        headers = curl_slist_append(headers, "User-Agent: Debian APT-HTTP/1.3 (1.0.1ubuntu2)");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-        curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errorBuffer);
-        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L); // 启用自定义进度输出
-        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
-        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, prefix);
-        
-        res = curl_easy_perform(curl);
-        std::cout << std::endl;
-        if (res != CURLE_OK) {
-            std::cerr << "curl_easy_perform() failed: " << errorBuffer << std::endl;
-            fclose(fp);
-            curl_easy_cleanup(curl);
-            return false;
-        }
-
-        fclose(fp);
-        curl_easy_cleanup(curl);
-        
-        return true;
-    }
-    return false;
-}
 
 bool DEBAR::Cache::__download_package(PackageInfoPtr package)
 {
     if (CACHE_INS->d->already_download.find(package->name) != CACHE_INS->d->already_download.end()) return true;
     std::string url = CACHE_INS->d->repo_url + "/" + package->filename;
     std::string text = "Downloading: " + package->name + " (" + package->version + ")";
-    download_file(url, CACHE_INS->d->path + "/" + package->filename.substr(package->filename.find_last_of("/")), text.c_str());
+    Utils::download_file(url, CACHE_INS->d->path + "/" + package->filename.substr(package->filename.find_last_of("/")), text.c_str());
 
     for (auto dep : package->depends)
     {
@@ -310,6 +248,35 @@ bool DEBAR::Cache::unzip_gz_file(const std::string &path)
     return true;
 }
 
+struct PackageName {
+    std::string name;
+    std::string version;
+};
+
+typedef std::vector<PackageName> PackageItem;
+
+PackageItem parsePackageItem(const std::string& item) {
+    auto packages = Utils::split_str(item, " | ");
+    PackageItem res;
+    for (auto pkg : packages)
+    {
+        auto tmp = Utils::split_str(pkg, " (");
+        PackageName name;
+        name.name = tmp[0];
+        if (name.name.find(":any") != std::string::npos)
+        {
+            name.name = name.name.substr(0, name.name.size() - 4);
+        }
+        
+        if (tmp.size() > 1)
+        {
+            name.version = tmp[1].substr(0, tmp[1].size() - 1);
+        }
+        res.push_back(name);
+    }
+    return res;
+}
+
 PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
 {
     auto pos = find_package_pos(name);
@@ -351,26 +318,34 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
     }
     CACHE_INS->d->already_found.insert(std::pair<std::string, PackageInfoPtr>(package->name, package));
 
-    while (depends_str.find(", ") != std::string::npos) {
-        auto depends = depends_str.substr(0, depends_str.find(", "));
-        depends_str = depends_str.substr(depends_str.find(", ") + 2);
-        auto dep_name = depends.substr(0, depends.find(" "));
-        if (CACHE_INS->d->already_found.find(dep_name) == CACHE_INS->d->already_found.end())
+    if (!depends_str.empty())
+    {
+        auto depends = Utils::split_str(depends_str, ", ");
+        for (auto dep_name : depends)
         {
-            package->depends.push_back(__find_package(dep_name));
-        } else {
-            package->depends.push_back(CACHE_INS->d->already_found[dep_name]);
+            auto dep = parsePackageItem(dep_name);
+            if (CACHE_INS->d->already_found.find(dep[0].name) == CACHE_INS->d->already_found.end())
+            {
+                package->depends.push_back(__find_package(dep[0].name));
+            } else {
+                package->depends.push_back(CACHE_INS->d->already_found[dep[0].name]);
+            }
         }
     }
-    while (suggests_str.find(", ") != std::string::npos) {
-        auto suggests = suggests_str.substr(0, suggests_str.find(", "));
-        suggests_str = suggests_str.substr(suggests_str.find(", ") + 2);
-        auto suggests_name = suggests.substr(0, suggests.find(" "));
-        if (CACHE_INS->d->already_found.find(suggests_name) == CACHE_INS->d->already_found.end())
+    
+    
+    if (!suggests_str.empty())
+    {
+        auto suggests = Utils::split_str(suggests_str, ", ");
+        for (auto suggests_name : suggests)
         {
-            package->suggests.push_back(__find_package(suggests_name));
-        } else {
-            package->suggests.push_back(CACHE_INS->d->already_found[suggests_name]);
+            auto sug = parsePackageItem(suggests_name);
+            if (CACHE_INS->d->already_found.find(sug[0].name) == CACHE_INS->d->already_found.end())
+            {
+                package->suggests.push_back(__find_package(sug[0].name));
+            } else {
+                package->suggests.push_back(CACHE_INS->d->already_found[sug[0].name]);
+            }
         }
     }
 

@@ -68,14 +68,6 @@ public:
     static bool download_package(const std::string& name);
 private:
 
-    /**
-     * @brief Download file from url.
-     * @param url The url of file.
-     * @param path The path to save file.
-     * @return true if download file successfully.
-     */
-    static bool download_file(const std::string& url, const std::string& path, const char* prefix);
-
     static bool __download_package(PackageInfoPtr package);
 
     /**
