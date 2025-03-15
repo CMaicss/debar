@@ -26,6 +26,7 @@ struct DEBAR::CachePrivate
     std::vector<std::string> components;
 
     std::map<std::string, PackageInfoPtr> already_found;
+    std::set<std::string> already_not_found;
     std::map<std::string, PackageInfoPtr> already_download;
 };
 
@@ -194,7 +195,8 @@ bool DEBAR::Cache::__download_package(PackageInfoPtr package)
     std::string url = CACHE_INS->d->repo_url + "/" + package->filename;
     std::string text = "Downloading: " + package->name + " (" + package->version + ")";
     Utils::download_file(url, CACHE_INS->d->path + "/" + package->filename.substr(package->filename.find_last_of("/")), text.c_str());
-
+    CACHE_INS->d->already_download.insert(std::pair<std::string, PackageInfoPtr>(package->name, package));
+    
     for (auto dep : package->depends)
     {
         __download_package(dep);
@@ -206,8 +208,6 @@ bool DEBAR::Cache::__download_package(PackageInfoPtr package)
             __download_package(suggests);
         }
     }
-    
-    CACHE_INS->d->already_download.insert(std::pair<std::string, PackageInfoPtr>(package->name, package));
 
     return true;
 }
@@ -325,14 +325,14 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
         {
             auto dep = parsePackageItem(dep_name);
             if (CACHE_INS->d->already_found.find(dep[0].name) == CACHE_INS->d->already_found.end())
-            {
-                package->depends.push_back(__find_package(dep[0].name));
+            {   
+                auto res = __find_package(dep[0].name);
+                if (res) package->depends.push_back(res);
             } else {
                 package->depends.push_back(CACHE_INS->d->already_found[dep[0].name]);
             }
         }
     }
-    
     
     if (!suggests_str.empty())
     {
@@ -342,7 +342,8 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
             auto sug = parsePackageItem(suggests_name);
             if (CACHE_INS->d->already_found.find(sug[0].name) == CACHE_INS->d->already_found.end())
             {
-                package->suggests.push_back(__find_package(sug[0].name));
+                auto res = __find_package(sug[0].name);
+                if (res) package->suggests.push_back(__find_package(sug[0].name));
             } else {
                 package->suggests.push_back(CACHE_INS->d->already_found[sug[0].name]);
             }
@@ -361,6 +362,12 @@ PackageInfoPtr DEBAR::Cache::find_package(const std::string &name) {
 
 InfoPos DEBAR::Cache::find_package_pos(const std::string &name)
 {
+    if (CACHE_INS->d->already_not_found.find(name) !=
+        CACHE_INS->d->already_not_found.end())
+    {
+        return InfoPos();
+    }
+    
     std::ifstream indexFile(CACHE_INS->d->path + "/.debar/index", std::ios::in | std::ios::binary);
     if (!indexFile) {
         std::cerr << "Failed to open index file." << std::endl;
@@ -382,7 +389,7 @@ InfoPos DEBAR::Cache::find_package_pos(const std::string &name)
             return infoPos;
         }
     }
-
+    CACHE_INS->d->already_not_found.insert(name);
     std::cerr << "Package not found: " << name << std::endl;
     return InfoPos();
 }
