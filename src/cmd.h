@@ -53,6 +53,12 @@ public:
      * @return true if --suggests argument is present.
      */
     static bool is_suggests();
+    
+    /**
+     * @brief Check if command line has --depends-mermaid argument.
+     * @return true if --depends-mermaid argument is present.
+     */
+    static bool is_depends_mermaid();
 
     /**
      * @brief Get package name from --get argument.

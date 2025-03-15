@@ -13,6 +13,7 @@ struct DEBAR::CMDPrivate
     bool update = false;
     bool get = false;
     bool suggests = false;
+    bool depends_mermaid = false;
     std::string package;
 };
 
@@ -45,6 +46,11 @@ bool DEBAR::CMD::is_suggests()
     return m_instance->d->suggests;
 }
 
+bool DEBAR::CMD::is_depends_mermaid()
+{
+    return m_instance->d->depends_mermaid;
+}
+
 std::string DEBAR::CMD::get_package_name()
 {
     return m_instance->d->package;
@@ -60,6 +66,7 @@ CMD::CMD(int argc, char const *argv[])
             ("update", "Update repo data in current directory.")
             ("get", "Download deb package and depends.", cxxopts::value<std::string>(), "<package_name>")
             ("suggests", "Think of suggests as depends, must cooperate --get used.")
+            ("depends-mermaid", "Print the dependency relationship using Mermaid.", cxxopts::value<std::string>(), "<package_name>")
             ("help", "Print help");
 
         auto result = options.parse(argc, argv);
@@ -81,10 +88,16 @@ CMD::CMD(int argc, char const *argv[])
             d->suggests = true;
         }
 
+        if (result.count("depends-mermaid")) {
+            d->depends_mermaid = true;
+            d->package = result["depends-mermaid"].as<std::string>();
+        }
+
         if (result.count("get")) {
             d->get = true;
             d->package = result["get"].as<std::string>();
         }
+        
     } catch (const cxxopts::exceptions::exception& e) {
         std::cerr << "Error parsing options: " << e.what() << std::endl;
         exit(1);
