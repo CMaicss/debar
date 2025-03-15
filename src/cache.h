@@ -10,20 +10,9 @@
 #include <vector>
 #include <memory>
 
-namespace DEBAR {
+#include "structs.h"
 
-struct PackageInfo;
-typedef std::shared_ptr<PackageInfo> PackageInfoPtr;
-struct PackageInfo {
-    std::string name;
-    std::string version;
-    std::string description;
-    std::vector<PackageInfoPtr> depends;
-    std::vector<PackageInfoPtr> suggests;
-    std::string filename;
-    size_t size;
-    std::string md5;
-};
+namespace DEBAR {
 
 struct InfoPos
 {
@@ -66,6 +55,13 @@ public:
      * @return true if download package successfully.
      */
     static bool download_package(const std::string& name);
+
+    /**
+     * @brief Find package by name.
+     * @param name The name of package.
+     * @return The package info.
+     */
+    static PackageInfoPtr find_package(const std::string& name);
 private:
 
     static bool __download_package(PackageInfoPtr package);
@@ -76,13 +72,6 @@ private:
      * @return true if unzip file successfully.
      */
     static bool unzip_gz_file(const std::string& path);
-
-    /**
-     * @brief Find package by name.
-     * @param name The name of package.
-     * @return The package info.
-     */
-    static PackageInfoPtr find_package(const std::string& name);
 
     static PackageInfoPtr __find_package(const std::string& name);
 

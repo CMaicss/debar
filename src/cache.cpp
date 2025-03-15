@@ -27,6 +27,7 @@ struct DEBAR::CachePrivate
 
     std::map<std::string, PackageInfoPtr> already_found;
     std::set<std::string> already_not_found;
+    std::set<std::string> exclude;
     std::map<std::string, PackageInfoPtr> already_download;
 };
 
@@ -74,6 +75,14 @@ bool DEBAR::Cache::load_work_directory()
         CACHE_INS->d->components = config["repo"]["components"].as<std::vector<std::string>>();
         CACHE_INS->d->arch = config["repo"]["arch"].as<std::string>();
         CACHE_INS->d->release_name = config["repo"]["release_name"].as<std::string>();
+        if (config["exclude"].IsDefined())
+        {
+            auto exclude = config["exclude"].as<std::vector<std::string>>();
+            for (auto e : exclude)
+            {
+                CACHE_INS->d->exclude.insert(e);
+            }
+        }
     }
     catch(const YAML::BadFile& e)
     {
@@ -194,9 +203,13 @@ bool DEBAR::Cache::__download_package(PackageInfoPtr package)
     if (CACHE_INS->d->already_download.find(package->name) != CACHE_INS->d->already_download.end()) return true;
     std::string url = CACHE_INS->d->repo_url + "/" + package->filename;
     std::string text = "Downloading: " + package->name + " (" + package->version + ")";
-    Utils::download_file(url, CACHE_INS->d->path + "/" + package->filename.substr(package->filename.find_last_of("/")), text.c_str());
+    std::string dir = CACHE_INS->d->path + "/packages";
+    if (!fs::exists(dir)) {
+        fs::create_directory(dir);
+    }
+    Utils::download_file(url, dir + package->filename.substr(package->filename.find_last_of("/")), text.c_str());
     CACHE_INS->d->already_download.insert(std::pair<std::string, PackageInfoPtr>(package->name, package));
-    
+
     for (auto dep : package->depends)
     {
         __download_package(dep);
@@ -281,6 +294,7 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
 {
     auto pos = find_package_pos(name);
     if (pos.name.empty()) return PackageInfoPtr();
+    if (CACHE_INS->d->exclude.find(name) != CACHE_INS->d->exclude.end()) return PackageInfoPtr();
 
     std::ifstream packageFile(CACHE_INS->d->path + "/.debar/" + pos.component + ".Packages", std::ios::in);
     if (!packageFile) {
@@ -390,7 +404,6 @@ InfoPos DEBAR::Cache::find_package_pos(const std::string &name)
         }
     }
     CACHE_INS->d->already_not_found.insert(name);
-    std::cerr << "Package not found: " << name << std::endl;
     return InfoPos();
 }
 
