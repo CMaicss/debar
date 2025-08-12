@@ -11,10 +11,12 @@ struct DEBAR::CMDPrivate
 {
     bool init = false;
     bool update = false;
+    bool search = false;
     bool get = false;
     bool suggests = false;
     bool depends_mermaid = false;
     std::string package;
+    std::string text;
 };
 
 
@@ -34,6 +36,10 @@ bool DEBAR::CMD::is_init()
 bool DEBAR::CMD::is_update()
 {
     return m_instance->d->update;
+}
+
+bool CMD::is_search() {
+    return m_instance->d->search;
 }
 
 bool DEBAR::CMD::is_get()
@@ -56,6 +62,10 @@ std::string DEBAR::CMD::get_package_name()
     return m_instance->d->package;
 }
 
+std::string CMD::get_text() {
+    return m_instance->d->text;
+}
+
 CMD::CMD(int argc, char const *argv[])
     : d(new CMDPrivate())
 {
@@ -64,6 +74,7 @@ CMD::CMD(int argc, char const *argv[])
         options.add_options()
             ("init", "Init repo data in current directory.")
             ("update", "Update repo data in current directory.")
+            ("search", "Search deb package.", cxxopts::value<std::string>(), "<text>")
             ("get", "Download deb package and depends.", cxxopts::value<std::string>(), "<package_name>")
             ("suggests", "Think of suggests as depends, must cooperate --get used.")
             ("depends-mermaid", "Print the dependency relationship using Mermaid.", cxxopts::value<std::string>(), "<package_name>")
@@ -96,6 +107,11 @@ CMD::CMD(int argc, char const *argv[])
         if (result.count("get")) {
             d->get = true;
             d->package = result["get"].as<std::string>();
+        }
+
+        if (result.count("search")) {
+            d->search = true;
+            d->text = result["search"].as<std::string>();
         }
         
     } catch (const cxxopts::exceptions::exception& e) {

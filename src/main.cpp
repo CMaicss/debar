@@ -31,7 +31,16 @@ int main(int argc, char const *argv[]) {
         auto name = DEBAR::CMD::get_package_name();
         if (!DEBAR::Cache::download_package(name)) return -1;
     }
-    
-    
+
+    if (DEBAR::CMD::is_search())
+    {
+        auto text = DEBAR::CMD::get_text();
+        auto packages = DEBAR::Cache::search_package(text);
+        for (auto pkg : packages) {
+            std::cout << pkg->name << " (" << pkg->version << ")" << std::endl;
+            std::cout << "\t" << pkg->description << "\n" << std::endl;
+        }
+    }
+
     return 0;
 }

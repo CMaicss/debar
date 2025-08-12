@@ -6,8 +6,8 @@
  */
 
 #pragma once
+#include <list>
 #include <string>
-#include <vector>
 #include <memory>
 
 #include "structs.h"
@@ -62,6 +62,14 @@ public:
      * @return The package info.
      */
     static PackageInfoPtr find_package(const std::string& name);
+
+    /**
+     * @brief Search package by a text.
+     * @param text A text for search.
+     * @return The text in package name.
+     */
+    static std::list<PackageInfoPtr> search_package(const std::string& text);
+
 private:
 
     static bool __download_package(PackageInfoPtr package);
@@ -73,7 +81,7 @@ private:
      */
     static bool unzip_gz_file(const std::string& path);
 
-    static PackageInfoPtr __find_package(const std::string& name);
+    static PackageInfoPtr get_package_info(const InfoPos& name);
 
     /**
      * @brief Find package position by name.
@@ -81,6 +89,8 @@ private:
      * @return The package position.
      */
     static InfoPos find_package_pos(const std::string& name);
+
+    static std::list<InfoPos> find_packages_pos(const std::string& name);
 private:
     Cache();
 };

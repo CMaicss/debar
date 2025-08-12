@@ -290,16 +290,15 @@ PackageItem parsePackageItem(const std::string& item) {
     return res;
 }
 
-PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
+PackageInfoPtr DEBAR::Cache::get_package_info(const InfoPos& pos)
 {
-    auto pos = find_package_pos(name);
-    if (pos.name.empty()) return PackageInfoPtr();
-    if (CACHE_INS->d->exclude.find(name) != CACHE_INS->d->exclude.end()) return PackageInfoPtr();
+    if (pos.name.empty()) return {};
+    if (CACHE_INS->d->exclude.find(pos.name) != CACHE_INS->d->exclude.end()) return {};
 
     std::ifstream packageFile(CACHE_INS->d->path + "/.debar/" + pos.component + ".Packages", std::ios::in);
     if (!packageFile) {
         std::cerr << "Failed to open package file: " << pos.component << ".Packages" << std::endl;
-        return PackageInfoPtr();
+        return {};
     }
 
     packageFile.seekg(pos.pos, std::ios::beg);
@@ -335,12 +334,13 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
     if (!depends_str.empty())
     {
         auto depends = Utils::split_str(depends_str, ", ");
-        for (auto dep_name : depends)
+        for (const auto& dep_name : depends)
         {
             auto dep = parsePackageItem(dep_name);
             if (CACHE_INS->d->already_found.find(dep[0].name) == CACHE_INS->d->already_found.end())
-            {   
-                auto res = __find_package(dep[0].name);
+            {
+                auto info_pos = find_package_pos(dep[0].name);
+                auto res = get_package_info(info_pos);
                 if (res) package->depends.push_back(res);
             } else {
                 package->depends.push_back(CACHE_INS->d->already_found[dep[0].name]);
@@ -351,13 +351,14 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
     if (!suggests_str.empty())
     {
         auto suggests = Utils::split_str(suggests_str, ", ");
-        for (auto suggests_name : suggests)
+        for (const auto& suggests_name : suggests)
         {
             auto sug = parsePackageItem(suggests_name);
             if (CACHE_INS->d->already_found.find(sug[0].name) == CACHE_INS->d->already_found.end())
             {
-                auto res = __find_package(sug[0].name);
-                if (res) package->suggests.push_back(__find_package(sug[0].name));
+                auto info_pos = find_package_pos(sug[0].name);
+                auto res = get_package_info(info_pos);
+                if (res) package->suggests.push_back(res);
             } else {
                 package->suggests.push_back(CACHE_INS->d->already_found[sug[0].name]);
             }
@@ -370,7 +371,19 @@ PackageInfoPtr DEBAR::Cache::__find_package(const std::string &name)
 
 PackageInfoPtr DEBAR::Cache::find_package(const std::string &name) {
     CACHE_INS->d->already_found.clear();
-    auto res = __find_package(name);
+    auto info = find_package_pos(name);
+    auto res = get_package_info(info);
+    return res;
+}
+
+std::list<PackageInfoPtr> DEBAR::Cache::search_package(const std::string &text) {
+    CACHE_INS->d->already_found.clear();
+    auto infos = find_packages_pos(text);
+    std::list<PackageInfoPtr> res;
+    for (auto info_pos : infos) {
+        auto info = get_package_info(info_pos);
+        res.push_back(info);
+    }
     return res;
 }
 
@@ -405,6 +418,40 @@ InfoPos DEBAR::Cache::find_package_pos(const std::string &name)
     }
     CACHE_INS->d->already_not_found.insert(name);
     return InfoPos();
+}
+
+std::list<InfoPos> Cache::find_packages_pos(const std::string &name) {
+
+    if (CACHE_INS->d->already_not_found.find(name) !=
+        CACHE_INS->d->already_not_found.end())
+    {
+        return {};
+    }
+
+    std::ifstream indexFile(CACHE_INS->d->path + "/.debar/index", std::ios::in | std::ios::binary);
+    if (!indexFile) {
+        std::cerr << "Failed to open index file." << std::endl;
+        return {};
+    }
+
+    char packageName[128];
+    char component[128];
+    std::streamoff pos;
+
+    std::list<InfoPos> res;
+    while (indexFile.read(packageName, 128)) {
+        indexFile.read(component, 128);
+        indexFile.read(reinterpret_cast<char*>(&pos), sizeof(std::streamoff));
+        if (std::string(packageName).find(name) != std::string::npos) {
+            InfoPos infoPos;
+            infoPos.name = packageName;
+            infoPos.component = component;
+            infoPos.pos = pos;
+            res.push_back(infoPos);
+        }
+    }
+    CACHE_INS->d->already_not_found.insert(name);
+    return res;
 }
 
 Cache::Cache()

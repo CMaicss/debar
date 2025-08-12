@@ -43,6 +43,12 @@ public:
     static bool is_update();
 
     /**
+     * @brief Check if command line has --search argument.
+     * @return true if --search argument is present.
+     */
+    static bool is_search();
+
+    /**
      * @brief Check if command line has --get argument.
      * @return true if --get argument is present.
      */
@@ -66,6 +72,11 @@ public:
      */
     static std::string get_package_name();
 
+    /**
+     * @brief Get param from --search argument.
+     * @return Search text.
+     */
+    static std::string get_text();
 private:
     CMD(int argc, char const *argv[]);
     ~CMD();
