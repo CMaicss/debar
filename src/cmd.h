@@ -77,6 +77,12 @@ public:
      * @return Search text.
      */
     static std::string get_text();
+
+    /**
+     * @brief Get info of the deb package.
+     * @return true if --info argument is present.
+     */
+    static bool is_info();
 private:
     CMD(int argc, char const *argv[]);
     ~CMD();

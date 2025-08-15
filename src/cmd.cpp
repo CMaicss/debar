@@ -13,6 +13,7 @@ struct DEBAR::CMDPrivate
     bool update = false;
     bool search = false;
     bool get = false;
+    bool info = false;
     bool suggests = false;
     bool depends_mermaid = false;
     std::string package;
@@ -66,6 +67,10 @@ std::string CMD::get_text() {
     return m_instance->d->text;
 }
 
+bool CMD::is_info() {
+    return m_instance->d->info;
+}
+
 CMD::CMD(int argc, char const *argv[])
     : d(new CMDPrivate())
 {
@@ -76,6 +81,7 @@ CMD::CMD(int argc, char const *argv[])
             ("update", "Update repo data in current directory.")
             ("search", "Search deb package.", cxxopts::value<std::string>(), "<text>")
             ("get", "Download deb package and depends.", cxxopts::value<std::string>(), "<package_name>")
+            ("info", "Show info of the deb package.", cxxopts::value<std::string>(), "<package_name>")
             ("suggests", "Think of suggests as depends, must cooperate --get used.")
             ("depends-mermaid", "Print the dependency relationship using Mermaid.", cxxopts::value<std::string>(), "<package_name>")
             ("help", "Print help");
@@ -107,6 +113,11 @@ CMD::CMD(int argc, char const *argv[])
         if (result.count("get")) {
             d->get = true;
             d->package = result["get"].as<std::string>();
+        }
+
+        if (result.count("info")) {
+            d->info = true;
+            d->package = result["info"].as<std::string>();
         }
 
         if (result.count("search")) {
